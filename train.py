@@ -5,6 +5,7 @@
 import argparse
 import logging
 import os
+import cv2
 import sys
 import model.model as model
 from eval import eval_net
@@ -40,7 +41,7 @@ class BasicDataset(Dataset):
         self.masks_dir = masks_dir
         #self.scale = scale
         self.preprocess= preprocess
-        self.scale = scale 
+        self.scale = scale
         self.mask_suffix = mask_suffix
 
         self.ids = [os.path.splitext(file)[0] for file in os.listdir(imgs_dir)
@@ -56,7 +57,7 @@ class BasicDataset(Dataset):
         img = np.array(pil_img)
         opencvImage = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         #cv2.imshow("sss",opencvImage)
-        
+
         return opencvImage
 
     def __getitem__(self, i):
