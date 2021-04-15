@@ -15,6 +15,7 @@ from torch import optim
 from PIL import Image
 from tqdm import tqdm
 import glob
+from augment import AUGMENTATIONS_TRAIN
 Image.MAX_IMAGE_PIXELS=None
 
 '''
@@ -34,13 +35,13 @@ val_dir = "../Colonoscopy_tissue_segment_dataset/val"
 
 
 class BasicDataset(Dataset):
-    def __init__(self, imgs_dir, masks_dir, scale=0.1, mask_suffix='_mask'):
+    def __init__(self, imgs_dir, masks_dir, preprocess=None, scale=512, mask_suffix='_mask'):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         #self.scale = scale
-        self.scale = 512
+        self.preprocess= preprocess
+        self.scale = scale 
         self.mask_suffix = mask_suffix
-        assert 0 < scale <= 1, 'Scale must be between 0 and 1'
 
         self.ids = [os.path.splitext(file)[0] for file in os.listdir(imgs_dir)
                     if not file.startswith('.')]   # get prefix or so-called id
@@ -51,7 +52,7 @@ class BasicDataset(Dataset):
         return len(self.ids)
 
     @classmethod
-    def preprocess(cls, pil_img):
+    def process(cls, pil_img):
         img = np.array(pil_img)
         opencvImage = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         #cv2.imshow("sss",opencvImage)
@@ -74,8 +75,8 @@ class BasicDataset(Dataset):
 
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
-        img = self.process(img)
         #show_img(img)
+        img = self.process(img)
         mask =self.process(mask)
         transformed = self.preprocess(image=img,mask=mask)
         img= transformed['image']
@@ -93,10 +94,10 @@ def train_net(net,
               val_percent=0.1,
               save_cp=True,
               criterion="dice",
-              img_scale=0.5):
+              img_scale=512):
 
     #dataset = BasicDataset(train_dir, train_mask_dir, img_scale)
-    dataset = BasicDataset(train_dir, train_mask_dir)
+    dataset = BasicDataset(train_dir, train_mask_dir,AUGMENTATIONS_TRAIN,img_scale)
     n_val = int(len(dataset) * val_percent)
     n_train = len(dataset) - n_val
     train, val = random_split(dataset, [n_train, n_val])
