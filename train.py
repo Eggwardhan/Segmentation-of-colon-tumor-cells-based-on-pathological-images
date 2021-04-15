@@ -51,23 +51,12 @@ class BasicDataset(Dataset):
         return len(self.ids)
 
     @classmethod
-    def preprocess(cls, pil_img, size=512):
-        w, h = pil_img.size
-        '''newW, newH = int(scale * w), int(scale * h)
-        assert newW > 0 and newH > 0, 'Scale is too small'''
-        pil_img = pil_img.resize((size, size))
-
-        img_nd = np.array(pil_img)
-
-        if len(img_nd.shape) == 2:
-            img_nd = np.expand_dims(img_nd, axis=2)
-
-        # HWC to CHW
-        img_trans = img_nd.transpose((2, 0, 1))
-        if img_trans.max() > 1:
-            img_trans = img_trans / 255
-
-        return img_trans
+    def preprocess(cls, pil_img):
+        img = np.array(pil_img)
+        opencvImage = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        #cv2.imshow("sss",opencvImage)
+        
+        return opencvImage
 
     def __getitem__(self, i):
         idx = self.ids[i]
@@ -85,10 +74,12 @@ class BasicDataset(Dataset):
 
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
-
-        img = self.preprocess(img, self.scale)
-        mask = self.preprocess(mask, self.scale)
-
+        img = self.process(img)
+        #show_img(img)
+        mask =self.process(mask)
+        transformed = self.preprocess(image=img,mask=mask)
+        img= transformed['image']
+        mask= transformed['mask']
         return {
             'image': torch.from_numpy(img).type(torch.FloatTensor),
             'mask': torch.from_numpy(mask).type(torch.FloatTensor)
