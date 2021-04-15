@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import sys
+import cv2
 import model.model as model
 from eval import eval_net
 import numpy as np
@@ -39,7 +40,7 @@ class BasicDataset(Dataset):
         self.imgs_dir = imgs_dir
         self.masks_dir = masks_dir
         #self.scale = scale
-        self.preprocess= preprocess
+        self.preprocess= None
         self.scale = scale 
         self.mask_suffix = mask_suffix
 
@@ -54,6 +55,7 @@ class BasicDataset(Dataset):
     @classmethod
     def process(cls, pil_img):
         img = np.array(pil_img)
+        
         opencvImage = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         #cv2.imshow("sss",opencvImage)
         
@@ -78,12 +80,20 @@ class BasicDataset(Dataset):
         #show_img(img)
         img = self.process(img)
         mask =self.process(mask)
-        transformed = self.preprocess(image=img,mask=mask)
-        img= transformed['image']
-        mask= transformed['mask']
+        if self.preprocess!= None:
+            transformed = self.preprocess(image=img,mask=mask)
+            img= transformed['image']
+            mask= transformed['mask']
+        img_trans = img.transpose((2, 0, 1))
+        if img_trans.max() > 1:
+            img_trans = img_trans / 255
+        mask_trans = mask.transpose((2, 0, 1))
+        if mask_trans.max() > 1:
+            mask_trans = mask_trans / 255
+        
         return {
-            'image': torch.from_numpy(img).type(torch.FloatTensor),
-            'mask': torch.from_numpy(mask).type(torch.FloatTensor)
+            'image': torch.from_numpy(img_trans).type(torch.FloatTensor),
+            'mask': torch.from_numpy(mask_trans).type(torch.FloatTensor)
         }
 
 def train_net(net,
@@ -145,6 +155,8 @@ def train_net(net,
             for batch in train_loader:
                 imgs = batch['image']
                 true_masks = batch['mask']
+                print(imgs.shape)
+                print(true_masks.shape)
                 assert imgs.shape[1] == net.n_channels, \
                     f'Network has been defined with {net.n_channels} input channels, ' \
                     f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
@@ -209,7 +221,7 @@ def get_args():
     parser.add_argument('-e', '--epochs', metavar='E', type=int, default=5,
                         help='Number of epochs', dest='epochs')
     parser.add_argument('-n', '--net' ,dest="net",type=str,default="unet",
-                        help="choose net")
+                        help="choose net like resnet")
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=4,
                         help='Batch size', dest='batchsize')
     parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?', default=0.0001,
