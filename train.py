@@ -7,6 +7,7 @@ import logging
 import os
 import cv2
 import sys
+import cv2
 import model.model as model
 from eval import eval_net
 import numpy as np
@@ -79,12 +80,25 @@ class BasicDataset(Dataset):
         #show_img(img)
         img = self.process(img)
         mask =self.process(mask)
-        transformed = self.preprocess(image=img,mask=mask)
-        img= transformed['image']
-        mask= transformed['mask']
+        if self.preprocess!= None:
+            transformed = self.preprocess(image=img,mask=mask)
+            img= transformed['image']
+            mask= transformed['mask']
+        img_trans = img.transpose((2, 0, 1))
+        if img_trans.max() > 1:
+            img_trans = img_trans / 255
+        #print(mask.shape)
+        Grayimg = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        ret, mask_trans = cv2.threshold(Grayimg, 12, 255,cv2.THRESH_BINARY)
+        #print(mask.shape)
+        '''
+        mask_trans = mask.transpose((2, 0, 1))
+        if mask_trans.max() > 1:
+            mask_trans = mask_trans / 255
+        '''
         return {
-            'image': torch.from_numpy(img).type(torch.FloatTensor),
-            'mask': torch.from_numpy(mask).type(torch.FloatTensor)
+            'image': torch.from_numpy(img_trans).type(torch.FloatTensor),
+            'mask': torch.from_numpy(mask_trans).type(torch.FloatTensor).unsqueeze(0)
         }
 
 def train_net(net,
@@ -99,11 +113,11 @@ def train_net(net,
 
     #dataset = BasicDataset(train_dir, train_mask_dir, img_scale)
     dataset = BasicDataset(train_dir, train_mask_dir,AUGMENTATIONS_TRAIN,img_scale)
-    n_val = int(len(dataset) * val_percent)
-    n_train = len(dataset) - n_val
-    train, val = random_split(dataset, [n_train, n_val])
-    train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
-    val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
+    dataset2 = BasicDataset(val_dir,val_mask_dir)
+    n_train=len(dataset)
+    n_val = len(dataset2)
+    train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
+    val_loader = DataLoader(dataset2, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
     writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
     global_step = 0
@@ -113,8 +127,8 @@ def train_net(net,
         Batch size:      {batch_size}
         Criterion:       {criterion}
         Learning rate:   {lr}
-        Training size:   {n_train}
-        Validation size: {n_val}
+        Training size:   {len(dataset)}
+        Validation size: {len(dataset2)}
         Checkpoints:     {save_cp}
         Device:          {device.type}
         Images scaling:  {img_scale}
@@ -155,7 +169,9 @@ def train_net(net,
                 #mask_type = torch.float32 if net.outc == 1 else torch.long
                 mask_type = torch.float32
                 true_masks = true_masks.to(device=device, dtype=mask_type)
+                #print("true mask shape: %s " % true_masks.shape)
                 masks_pred = net(imgs)
+                #print("predict mask shape:%s" % mask_pred.shape)
                 loss = criterion(masks_pred,true_masks)
                 epoch_loss += loss.item()
                 writer.add_scalar('Loss/train', loss.item(), global_step)
@@ -210,7 +226,7 @@ def get_args():
     parser.add_argument('-e', '--epochs', metavar='E', type=int, default=5,
                         help='Number of epochs', dest='epochs')
     parser.add_argument('-n', '--net' ,dest="net",type=str,default="unet",
-                        help="choose net")
+                        help="choose net like resnet")
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=4,
                         help='Batch size', dest='batchsize')
     parser.add_argument('-l', '--learning-rate', metavar='LR', type=float, nargs='?', default=0.0001,
@@ -270,7 +286,7 @@ if __name__ == '__main__':
                   img_scale=args.scale,
                   val_percent=args.val / 100)
     except KeyboardInterrupt:
-        torch.save(net.state_dict(), args.net+args.batch+'INTERRUPTED.pth')
+        torch.save(net.state_dict(), args.net+args.batch_size+'INTERRUPTED.pth')
         logging.info('Saved interrupt')
         try:
             sys.exit(0)
