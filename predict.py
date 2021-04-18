@@ -3,17 +3,16 @@
 import argparse
 import logging
 import os
-
+import cv2
 import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
-
-from unet import UNet
-from utils.data_vis import plot_img_and_mask
+from augment import AUGMENTATIONS_TEST
+'''from utils.data_vis import plot_img_and_mask
 from utils.dataset import BasicDataset
-
+'''
 
 def predict_img(net,
                 full_img,
@@ -21,10 +20,19 @@ def predict_img(net,
                 scale_factor=1,
                 out_threshold=0.5):
     net.eval()
-
-    img = torch.from_numpy(BasicDataset.preprocess(full_img, scale_factor))
-
-    img = img.unsqueeze(0)
+    def process(full_img):
+        img = Image.open(full_img)
+        img = np.array(img)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+        preprocess = AUGMENTATIONS_TEST
+        transformed = preprocess(image=img)
+        img= transformed['image']
+        img_trans = img.transpose((2, 0, 1))
+        if img_trans.max() > 1:
+            img_trans = img_trans / 255
+        #print(mask.shape)
+        return torch.from_numpy(img_trans).type(torch.FloatTensor).unsqueeze(0)
+    img = process(full_img)
     img = img.to(device=device, dtype=torch.float32)
 
     with torch.no_grad():
@@ -47,8 +55,10 @@ def predict_img(net,
 
         probs = tf(probs.cpu())
         full_mask = probs.squeeze().cpu().numpy()
-
-    return full_mask > out_threshold
+        net.train()
+        mask = full_mask > out_threshold
+        
+    return mask
 
 
 def get_args():
@@ -98,7 +108,50 @@ def get_output_filenames(args):
 def mask_to_image(mask):
     return Image.fromarray((mask * 255).astype(np.uint8))
 
-
+def total_predict(ori_image,threshold=100):
+    h_step = ori_image.shape[0] // 256
+    w_step = ori_image.shape[1] // 256
+    
+    h_rest = -(ori_image.shape[0] - 256 * h_step)
+    w_rest = -(ori_image.shape[1] - 256 * w_step)
+    image_list = []
+    predict_img = []
+    for h in range(h_step):      # 截取片段
+        for w in range(w_step):
+            image_sample = ori_image[ (h*256):(h*256+256),
+            (w*256 ) : (w*256 + 256), : ]
+            image_list.append(image_sample)  
+        image_list.append(ori_image[( h* 256) : (h*256 +256), -256:, :])
+    for w in range(w_step-1):   
+        image_list.append(ori_image[-256:, (w*256):(w*256 +256), :])
+    image_list.append(ori_image[-256:, -256:, :])
+    
+    
+    for image in image_list:        
+        image = image.transpose((2, 0, 1))
+        image = torch.from_numpy(image).type(torch.FloatTensor)
+        image=image.unsqueeze(0)
+        pred1 = net(image)
+        pred1 = pred1.squeeze(0).astype(np.int8)
+        pred = pred>threshold
+        predict_list.append(pred)
+    # contact croped and predicted picture
+    count_temp = 0
+    tmp = np.ones([ori_image.shape[0]],ori_image.shape[1])
+    for h in range(h_step):
+        for w in range(w_step):
+            tmp[
+                h*256:(h+1)*256,
+                w*256:(w+1)*256
+            ] = predict_list[count_temp]
+            count_temp += 1
+        tmp[h *256 :(h+1) *256, w_rest:] = predict_list[count_temp][:, w_rest:]
+        count_temp+=1
+    for w in range(w_step -1):
+        tmp[h_rest:, (w *256):(w*256+256)] = predict_list[count_temp][h_rest:,:]
+        count_temp+=1
+    tmp[-257:-1,-257:-1] = predict_list[count_temp][:, :]
+    return tmp
 if __name__ == "__main__":
     args = get_args()
     in_files = args.input
@@ -117,9 +170,7 @@ if __name__ == "__main__":
 
     for i, fn in enumerate(in_files):
         logging.info("\nPredicting image {} ...".format(fn))
-
         img = Image.open(fn)
-
         mask = predict_img(net=net,
                            full_img=img,
                            scale_factor=args.scale,

@@ -17,7 +17,7 @@ from torch import optim
 from PIL import Image
 from tqdm import tqdm
 import glob
-from augment import AUGMENTATIONS_TRAIN
+from augment import AUGMENTATIONS_TRAIN,AUGMENTATIONS_TEST
 Image.MAX_IMAGE_PIXELS=None
 
 '''
@@ -44,7 +44,6 @@ class BasicDataset(Dataset):
         self.preprocess= preprocess
         self.scale = scale
         self.mask_suffix = mask_suffix
-
         self.ids = [os.path.splitext(file)[0] for file in os.listdir(imgs_dir)
                     if not file.startswith('.')]   # get prefix or so-called id
         logging.info(f'Creating dataset with {len(self.ids)} examples')
@@ -54,12 +53,36 @@ class BasicDataset(Dataset):
         return len(self.ids)
 
     @classmethod
-    def process(cls, pil_img):
+    def process(cls, pil_img,pil_mask,preprocess=None):
         img = np.array(pil_img)
-        opencvImage = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        #cv2.imshow("sss",opencvImage)
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    
+    
+        mask = np.array(pil_mask)
+        mask = cv2.cvtColor(mask, cv2.COLOR_RGB2BGR)
+        if preprocess!= None:
+            transformed = preprocess(image=img,mask=mask)
+            img= transformed['image']
+            mask= transformed['mask']
+ 
+        elif self.preprocess!= None:
+            transformed = self.preprocess(image=img,mask=mask)
+            img= transformed['image']
+            mask= transformed['mask']
 
-        return opencvImage
+        img_trans = img.transpose((2, 0, 1))
+        if img_trans.max() > 1:
+            img_trans = img_trans / 255
+        #print(mask.shape)
+        Grayimg = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+        ret, mask_trans = cv2.threshold(Grayimg, 12, 255,cv2.THRESH_BINARY)
+        #cv2.imshow("sss",opencvImage)
+        _ = {
+            'image': torch.from_numpy(img_trans).type(torch.FloatTensor),
+            'mask': torch.from_numpy(mask_trans).type(torch.FloatTensor).unsqueeze(0)
+        }
+
+        return _
 
     def __getitem__(self, i):
         idx = self.ids[i]
@@ -78,28 +101,15 @@ class BasicDataset(Dataset):
         assert img.size == mask.size, \
             f'Image and mask {idx} should be the same size, but are {img.size} and {mask.size}'
         #show_img(img)
-        img = self.process(img)
-        mask =self.process(mask)
-        if self.preprocess!= None:
-            transformed = self.preprocess(image=img,mask=mask)
-            img= transformed['image']
-            mask= transformed['mask']
-        img_trans = img.transpose((2, 0, 1))
-        if img_trans.max() > 1:
-            img_trans = img_trans / 255
-        #print(mask.shape)
-        Grayimg = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
-        ret, mask_trans = cv2.threshold(Grayimg, 12, 255,cv2.THRESH_BINARY)
-        #print(mask.shape)
+        #img = self.process(img)
+        #mask = self.process(mask)
+        
         '''
         mask_trans = mask.transpose((2, 0, 1))
         if mask_trans.max() > 1:
             mask_trans = mask_trans / 255
         '''
-        return {
-            'image': torch.from_numpy(img_trans).type(torch.FloatTensor),
-            'mask': torch.from_numpy(mask_trans).type(torch.FloatTensor).unsqueeze(0)
-        }
+        return self.process(img,mask)
 
 def train_net(net,
               device,
@@ -113,7 +123,7 @@ def train_net(net,
 
     #dataset = BasicDataset(train_dir, train_mask_dir, img_scale)
     dataset = BasicDataset(train_dir, train_mask_dir,AUGMENTATIONS_TRAIN,img_scale)
-    dataset2 = BasicDataset(val_dir,val_mask_dir)
+    dataset2 = BasicDataset(val_dir,val_mask_dir,AUGMENTATIONS_TEST)
     n_train=len(dataset)
     n_val = len(dataset2)
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
@@ -154,7 +164,6 @@ def train_net(net,
 
     for epoch in range(epochs):
         net.train()
-
         epoch_loss = 0
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
@@ -255,11 +264,8 @@ if __name__ == '__main__':
     #   - For 1 class and background, use n_classes=1
     #   - For 2 classes, use n_classes=1
     #   - For N > 2 classes, use n_classes=N
-    #net = UNet(n_channels=3, n_classes=1, bilinear=True)
     net =  model.choose_net(args.net)
-    #net = model.resnet34(in_channel=3, out_channel=1,pretrain=False)
     net = net(in_channel=3,out_channel=1)
-    #print(net.channels)
     logging.info(f'Network:\n'
                 f'\t{net.n_channels} input channels\n'
                  f'\t{net.n_classes} output channels (classes)\n'
