@@ -65,11 +65,6 @@ class BasicDataset(Dataset):
             img= transformed['image']
             mask= transformed['mask']
  
-        elif self.preprocess!= None:
-            transformed = self.preprocess(image=img,mask=mask)
-            img= transformed['image']
-            mask= transformed['mask']
-
         img_trans = img.transpose((2, 0, 1))
         if img_trans.max() > 1:
             img_trans = img_trans / 255
@@ -81,6 +76,7 @@ class BasicDataset(Dataset):
             'image': torch.from_numpy(img_trans).type(torch.FloatTensor),
             'mask': torch.from_numpy(mask_trans).type(torch.FloatTensor).unsqueeze(0)
         }
+
 
         return _
 
@@ -109,8 +105,11 @@ class BasicDataset(Dataset):
         if mask_trans.max() > 1:
             mask_trans = mask_trans / 255
         '''
-        return self.process(img,mask)
-
+        _ =  self.process(img,mask, self.preprocess)
+        #print("mask shape",_['mask'].shape)
+       # print("mask tensor",_['mask'])
+        #print("image shape",_['image'].shape)
+        return _
 def train_net(net,
               device,
               epochs=10,
@@ -168,7 +167,7 @@ def train_net(net,
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
                 imgs = batch['image']
-                true_masks = batch['mask']
+                true_masks = batch['mask']/255
                 assert imgs.shape[1] == net.n_channels, \
                     f'Network has been defined with {net.n_channels} input channels, ' \
                     f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
