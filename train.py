@@ -56,18 +56,17 @@ class BasicDataset(Dataset):
     def process(cls, pil_img,pil_mask,preprocess=None):
         img = np.array(pil_img)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-    
-    
         mask = np.array(pil_mask)
         mask = cv2.cvtColor(mask, cv2.COLOR_RGB2BGR)
         if preprocess!= None:
             transformed = preprocess(image=img,mask=mask)
             img= transformed['image']
             mask= transformed['mask']
- 
+
         img_trans = img.transpose((2, 0, 1))
         if img_trans.max() > 1:
             img_trans = img_trans / 255
+        #mask_trans = mask.transpose((2,0,1))
         #print(mask.shape)
         Grayimg = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
         ret, mask_trans = cv2.threshold(Grayimg, 12, 255,cv2.THRESH_BINARY)
@@ -99,7 +98,7 @@ class BasicDataset(Dataset):
         #show_img(img)
         #img = self.process(img)
         #mask = self.process(mask)
-        
+
         '''
         mask_trans = mask.transpose((2, 0, 1))
         if mask_trans.max() > 1:
@@ -168,6 +167,7 @@ def train_net(net,
             for batch in train_loader:
                 imgs = batch['image']
                 true_masks = batch['mask']/255
+                #true_masks =batch['mask']
                 assert imgs.shape[1] == net.n_channels, \
                     f'Network has been defined with {net.n_channels} input channels, ' \
                     f'but loaded images have {imgs.shape[1]} channels. Please check that ' \
@@ -254,7 +254,8 @@ def get_args():
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = get_args()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device =torch.device("cuda:1")
     logging.info(f'Using device {device}')
 
     # Change here to adapt to your data
