@@ -292,7 +292,7 @@ if __name__ == '__main__':
                   img_scale=args.scale,
                   val_percent=args.val / 100)
     except KeyboardInterrupt:
-        torch.save(net.state_dict(), args.net+args.batch_size+'INTERRUPTED.pth')
+        torch.save(net.state_dict(), args.net+args.batchsize+'INTERRUPTED.pth')
         logging.info('Saved interrupt')
         try:
             sys.exit(0)

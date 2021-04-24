@@ -27,6 +27,6 @@ AUGMENTATIONS_TEST = Compose([
     RandomSizedCrop(min_max_height=(512,1024),height = size, width =size,p=1),
     ToFloat(max_value=1)
 ],p=1)
-AUGMENTATIONS_TEST2= Compose([
+AUGMENTATIONS_TEST2 = Compose([
     ToFloat(max_value=1)
 ],p=1)
