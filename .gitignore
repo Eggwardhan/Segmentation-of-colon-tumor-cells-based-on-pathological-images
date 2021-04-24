@@ -1,4 +1,5 @@
 check_point
+.vscode
 __pycache__
 runs
 code.tar.gz
