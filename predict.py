@@ -14,23 +14,25 @@ from augment import AUGMENTATIONS_TEST
 from utils.dataset import BasicDataset
 '''
 
+
 def predict_img(net,
                 full_img,
                 device,
                 scale_factor=1,
                 out_threshold=0.5):
     net.eval()
+
     def process(full_img):
         img = Image.open(full_img)
         img = np.array(img)
         img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
         preprocess = AUGMENTATIONS_TEST
         transformed = preprocess(image=img)
-        img= transformed['image']
+        img = transformed['image']
         img_trans = img.transpose((2, 0, 1))
         if img_trans.max() > 1:
             img_trans = img_trans / 255
-        #print(mask.shape)
+        # print(mask.shape)
         return torch.from_numpy(img_trans).type(torch.FloatTensor).unsqueeze(0)
     img = process(full_img)
     img = img.to(device=device, dtype=torch.float32)
@@ -57,7 +59,7 @@ def predict_img(net,
         full_mask = probs.squeeze().cpu().numpy()
         net.train()
         mask = full_mask > out_threshold
-        
+
     return mask
 
 
@@ -97,7 +99,8 @@ def get_output_filenames(args):
             pathsplit = os.path.splitext(f)
             out_files.append("{}_OUT{}".format(pathsplit[0], pathsplit[1]))
     elif len(in_files) != len(args.output):
-        logging.error("Input files and output files are not of the same length")
+        logging.error(
+            "Input files and output files are not of the same length")
         raise SystemExit()
     else:
         out_files = args.output
@@ -108,36 +111,44 @@ def get_output_filenames(args):
 def mask_to_image(mask):
     return Image.fromarray((mask * 255).astype(np.uint8))
 
-def total_predict(ori_image,threshold=100):
-    h_step = ori_image.shape[0] // 256
-    w_step = ori_image.shape[1] // 256
-    
+
+def total_predict(ori_image, threshold=100):
+    # PIL Get image size (width, height) 
+    # nparray get image size (row (height), column (width), color (3))
+    img =Image.open(img_url)
+    #print(img.size)
+    ori_image=np.array(img)
+    #ori_image = process(ori_image)
+    #print("ori_image:",ori_image.shape)
+    h_step = ori_image.shape[0]//256
+    w_step = ori_image.shape[1]//256
+
     h_rest = -(ori_image.shape[0] - 256 * h_step)
     w_rest = -(ori_image.shape[1] - 256 * w_step)
     image_list = []
-    predict_img = []
+    predict_list = []
     for h in range(h_step):      # 截取片段
         for w in range(w_step):
             image_sample = ori_image[ (h*256):(h*256+256),
-            (w*256 ) : (w*256 + 256), : ]
+            (w*256 ) : (w*256 + 256), : ]/255
             image_list.append(image_sample)  
-        image_list.append(ori_image[( h* 256) : (h*256 +256), -256:, :])
+        image_list.append(ori_image[( h* 256) : (h*256 +256), -256:, :]/255)
     for w in range(w_step-1):   
-        image_list.append(ori_image[-256:, (w*256):(w*256 +256), :])
-    image_list.append(ori_image[-256:, -256:, :])
-    
-    
-    for image in image_list:        
+        image_list.append(ori_image[-256:, (w*256):(w*256 +256), :]/255)
+    image_list.append(ori_image[-256:, -256:, :]/255)
+
+    for image in image_list:       
         image = image.transpose((2, 0, 1))
         image = torch.from_numpy(image).type(torch.FloatTensor)
-        image=image.unsqueeze(0)
+        image = image.unsqueeze(0)
+        #print(image.shape)
+        image.to(device="cuda", dtype=torch.float32)
         pred1 = net(image)
-        pred1 = pred1.squeeze(0).astype(np.int8)
-        pred = pred>threshold
+        pred1 = pred1.squeeze(0).squeeze(0)
+        pred = pred1>threshold
         predict_list.append(pred)
-    # contact croped and predicted picture
     count_temp = 0
-    tmp = np.ones([ori_image.shape[0]],ori_image.shape[1])
+    tmp = np.ones([ori_image.shape[0],ori_image.shape[1]])
     for h in range(h_step):
         for w in range(w_step):
             tmp[
@@ -152,6 +163,8 @@ def total_predict(ori_image,threshold=100):
         count_temp+=1
     tmp[-257:-1,-257:-1] = predict_list[count_temp][:, :]
     return tmp
+
+
 if __name__ == "__main__":
     args = get_args()
     in_files = args.input
@@ -185,5 +198,6 @@ if __name__ == "__main__":
             logging.info("Mask saved to {}".format(out_files[i]))
 
         if args.viz:
-            logging.info("Visualizing results for image {}, close to continue ...".format(fn))
+            logging.info(
+                "Visualizing results for image {}, close to continue ...".format(fn))
             plot_img_and_mask(img, mask)
