@@ -21,7 +21,7 @@ def eval_net(net, loader, device):
 
             with torch.no_grad():
                 mask_pred = net(imgs)
-
+                print(mask_pred)
             if net.n_classes > 1:
                 tot += F.cross_entropy(mask_pred, true_masks).item()
             else:

@@ -142,7 +142,7 @@ def train_net(net,
         Images scaling:  {img_scale}
     ''')
     #优化器
-#    optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
+    #optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
     optimizer = optim.Adam(net.parameters(), lr=lr,  weight_decay=0.001)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.outc > 1 else 'max', patience=8)
     #if net.outc > 1:
@@ -222,7 +222,7 @@ def train_net(net,
             except OSError:
                 pass
             torch.save(net.state_dict(),
-                       dir_checkpoint + f'{args.net}batch{args.batchsize}scale{args.scale}epoch{epoch + 1}.pth')
+                       dir_checkpoint + f'{args.net}batch{str(args.batchsize)}scale{args.scale}criterion{args.criterion}epoch{epoch + 1}.pth')
             logging.info(f'Checkpoint {epoch + 1} saved !')
 
     writer.close()
@@ -255,7 +255,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = get_args()
     #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device =torch.device("cuda:1")
+    device =torch.device("cuda:0")
     logging.info(f'Using device {device}')
 
     # Change here to adapt to your data
@@ -292,7 +292,7 @@ if __name__ == '__main__':
                   img_scale=args.scale,
                   val_percent=args.val / 100)
     except KeyboardInterrupt:
-        torch.save(net.state_dict(), args.net+args.batchsize+'INTERRUPTED.pth')
+        torch.save(net.state_dict(), args.net+str(args.batchsize)+args.criterion+'INTERRUPTED.pth')
         logging.info('Saved interrupt')
         try:
             sys.exit(0)
