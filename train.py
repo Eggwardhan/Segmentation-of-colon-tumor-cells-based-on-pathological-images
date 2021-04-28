@@ -127,7 +127,7 @@ def train_net(net,
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
     val_loader = DataLoader(dataset2, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
-    writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}')
+    writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}_LOSS_{criterion}')
     global_step = 0
     # 基本信息
     logging.info(f'''Starting training:
@@ -142,9 +142,10 @@ def train_net(net,
         Images scaling:  {img_scale}
     ''')
     #优化器
-    #optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
+    #optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-4, momentum=0.9)
+    #optimizer = optim.SGD(net.parameters(), lr=lr, momentum=0.9,weight_decay=1e-4)
     optimizer = optim.Adam(net.parameters(), lr=lr,  weight_decay=0.001)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.outc > 1 else 'max', patience=8)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.outc > 1 else 'max',factor=0.5, patience=8)
     #if net.outc > 1:
     def dice_loss(input , target):
         input = torch.sigmoid(input)
@@ -153,10 +154,21 @@ def train_net(net,
         tflat = target.view(-1)
         intersection = (iflat * tflat).sum()
         return 1-((2.0*intersection + smooth)/(iflat.sum()+tflat.sum()+smooth))
+    def combo_loss(input,target,alpha=0.7):
+        loss1=nn.BCEWithLogitsLoss(torch.FloatTensor([7]))
+        tmp = alpha*loss1(input,target)-(1-alpha)*(1-dice_loss(input,target))
+        return tmp
+    def generalized_loss(input,target):
+        dice_l = dice_loss(input,target)
+        input = torch.sigmoid(input)
+
+
     if  criterion=="bce":
         criterion = nn.BCEWithLogitsLoss()
     elif criterion ==  "cross":
-        criterion == nn.CrossEntropyLoss()
+        criterion = nn.CrossEntropyLoss()
+    elif criterion =="combo":
+        criterion = combo_loss
     else:
         criterion = dice_loss
 
@@ -255,7 +267,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     args = get_args()
     #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    device =torch.device("cuda:0")
+    device =torch.device("cuda:1")
     logging.info(f'Using device {device}')
 
     # Change here to adapt to your data
@@ -292,7 +304,7 @@ if __name__ == '__main__':
                   img_scale=args.scale,
                   val_percent=args.val / 100)
     except KeyboardInterrupt:
-        torch.save(net.state_dict(), args.net+str(args.batchsize)+args.criterion+'INTERRUPTED.pth')
+        torch.save(net.state_dict(), "./interupted/"+args.net+str(args.batchsize)+args.criterion+'.pth')
         logging.info('Saved interrupt')
         try:
             sys.exit(0)
