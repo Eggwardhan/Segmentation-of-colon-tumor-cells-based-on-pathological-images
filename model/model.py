@@ -260,14 +260,18 @@ class ResNet(nn.Module):
 
         return out
 
-    def load_pretrained_weights(self):
+    def load_pretrained_weights(self,model_name):
          # 导入自己模型的参数
         model_dict=self.state_dict()
-        resnet34_weights = models.resnet34(True).state_dict()
+        if model_name=="resnet34":
+            resnet_weights = models.resnet34(True).state_dict()
+        elif model_name="resnet50":
+            resnet_weights = mdoels.renet50(True).state_dict()
+        
         count_res = 0
         count_my = 0
 
-        reskeys = list(resnet34_weights.keys())
+        reskeys = list(resnet_weights.keys())
         mykeys = list(model_dict.keys())
         # print(self)  自己网络的结构
         # print(models.resnet34())   resnet结构
@@ -291,13 +295,13 @@ class ResNet(nn.Module):
             count_my += 1
 
         for k_res, k_my in corresp_map:
-            model_dict[k_my]=resnet34_weights[k_res]
+            model_dict[k_my]=resnet_weights[k_res]
 
         try:
             self.load_state_dict(model_dict)
-            print("Loaded resnet34 weights in mynet !")
+            print("Loaded resnet_weights weights in mynet !")
         except:
-            print("Error resnet 34 weights in mynet !")
+            print("Error resnet_weights 34 weights in mynet !")
             raise
 
 def resnet18():
