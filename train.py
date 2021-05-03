@@ -155,7 +155,7 @@ def train_net(net,
         intersection = (iflat * tflat).sum()
         return 1-((2.0*intersection + smooth)/(iflat.sum()+tflat.sum()+smooth))
     def combo_loss(input,target,alpha=0.7):
-        loss1=nn.BCEWithLogitsLoss(torch.FloatTensor([7]))
+        loss1=nn.BCEWithLogitsLoss(torch.Tensor([7]).to(device))
         tmp = alpha*loss1(input,target)-(1-alpha)*(1-dice_loss(input,target))
         return tmp
     def generalized_loss(input,target):
