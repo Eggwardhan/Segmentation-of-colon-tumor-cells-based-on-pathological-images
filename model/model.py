@@ -6,6 +6,7 @@ from torchvision import models
 import torch.nn.functional as F
 from .nested_unet import NestedUNet
 from .nested_unet import unet as UNet
+import torch.utils.model_zoo as model_zoo
 
 
 def DoubleConv(in_channels, out_channels,mid_channels=None):
@@ -184,9 +185,9 @@ class ResNet(nn.Module):
         # self.fc = nn.Linear(512 * block.expansion, num_classes)
         self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
 
-        self.dconv_up3 = double_conv(256 + 512, 256)
-        self.dconv_up2 = double_conv(128 + 256, 128)
-        self.dconv_up1 = double_conv(128 + 64, 64)
+        self.dconv_up3 = DoubleConv(256 + 512, 256)
+        self.dconv_up2 = DoubleConv(128 + 256, 128)
+        self.dconv_up1 = DoubleConv(128 + 64, 64)
 
         self.dconv_last=nn.Sequential(
             nn.Conv2d(128, 64, 3, padding=1),
@@ -319,7 +320,8 @@ def resnet50(in_channel,out_channel,pretrain=True):
     """
     model=ResNet(in_channel,out_channel,BottleNeck, [3, 4, 6, 3])
     if pretrain:
-        model.load_pretrained_weigh  ts()
+        url = "https://s3.amazonaws.com/pytorch/models/resnet50-19c8e357.pth"
+        model.load_state_dict(model_zoo.load_url(url))
     return model
 
 def resnet101():
