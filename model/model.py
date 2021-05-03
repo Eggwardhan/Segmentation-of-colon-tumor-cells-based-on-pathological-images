@@ -312,10 +312,15 @@ def resnet34(in_channel,out_channel,pretrain=True):
         model.load_pretrained_weights()
     return model
 
-def resnet50():
+def resnet50(in_channel,out_channel,pretrain=True):
     """ return a ResNet 50 object
+    args:
+        pretrain(bool): if true , return a model pre-trained on imagenet
     """
-    return ResNet(BottleNeck, [3, 4, 6, 3])
+    model=ResNet(in_channel,out_channel,BottleNeck, [3, 4, 6, 3])
+    if pretrain:
+        model.load_pretrained_weigh  ts()
+    return model
 
 def resnet101():
     """ return a ResNet 101 object
@@ -330,6 +335,8 @@ def resnet152():
 def choose_net(net_name):
     if net_name=="resnet34":
         return resnet34
+    if net_name=="resnet50":
+        return resnet50
     elif net_name=="unet":
         return UNet
     elif net_name=="nested_unet":
