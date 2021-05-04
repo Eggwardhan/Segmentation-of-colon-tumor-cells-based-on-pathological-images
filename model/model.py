@@ -265,9 +265,9 @@ class ResNet(nn.Module):
         model_dict=self.state_dict()
         if model_name=="resnet34":
             resnet_weights = models.resnet34(True).state_dict()
-        elif model_name="resnet50":
+        elif model_name=="resnet50":
             resnet_weights = mdoels.renet50(True).state_dict()
-        
+
         count_res = 0
         count_my = 0
 
