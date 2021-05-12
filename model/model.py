@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
-from nested_unet import NestedUNet
-from nested_unet import unet as UNet
+from .nested_unet import NestedUNet
+from .nested_unet import unet as UNet
 import torch.utils.model_zoo as model_zoo
 from  UResNet import UNetWithResnet50Encoder  as resnet50
 
@@ -350,11 +350,12 @@ def choose_net(net_name):
         return NestedUNet
 
 
-#net = resnet34(3, 4, False) # out_channel = 4  4分类问题
-#print(net)
-x = torch.rand((1, 3, 512, 512)) #N，C, H, W
-net = choose_net("resnet50")
-net=net(3,1)
-print(net)
-#print(net.forward(x).shape)
+if __name__ == '__main__':
+    #net = resnet34(3, 4, False) # out_channel = 4  4分类问题
+    #print(net)
+    x = torch.rand((1, 3, 512, 512)) #N，C, H, W
+    net = choose_net("resnet50")
+    net=net(3,1)
+    print(net)
+    #print(net.forward(x).shape)
 
