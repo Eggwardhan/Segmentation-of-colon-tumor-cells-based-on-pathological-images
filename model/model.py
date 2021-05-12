@@ -4,10 +4,10 @@ import torch
 import torch.nn as nn
 from torchvision import models
 import torch.nn.functional as F
-from .nested_unet import NestedUNet
-from .nested_unet import unet as UNet
+from nested_unet import NestedUNet
+from nested_unet import unet as UNet
 import torch.utils.model_zoo as model_zoo
-
+from  UResNet import UNetWithResnet50Encoder  as resnet50
 
 def DoubleConv(in_channels, out_channels,mid_channels=None):
     if not mid_channels:
@@ -169,9 +169,8 @@ class ResNet(nn.Module):
         self.in_channels = 64
         self.outc =self.n_classes = out_channel #不能加self.out_channel  不是很懂为啥 估计是变量优先级问题
 
-
         self.conv1 = nn.Sequential(
-            nn.Conv2d(in_channel, 64, kernel_size = 7, stride = 2, padding = 3,bias=False),
+            nn.Conv2d(3, 64, kernel_size = 7, stride = 2, padding = 3,bias=False),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True))
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -323,12 +322,12 @@ def resnet50(in_channel,out_channel,pretrain=True):
     args:
         pretrain(bool): if true , return a model pre-trained on imagenet
     """
-    model=ResNet(in_channel,out_channel,BottleNeck, [3, 4, 6, 3])
+    '''model=ResNet(in_channel,out_channel,BottleNeck, [3, 4, 6, 3])
     if pretrain:
         url = "https://s3.amazonaws.com/pytorch/models/resnet50-19c8e357.pth"
         #model.load_state_dict(model_zoo.load_url(url))
-        model.load_pretrained_weights("resnet50")
-    return model
+        model.load_pretrained_weights("resnet50")'''
+    return resnet50
 
 def resnet101():
     """ return a ResNet 101 object
@@ -351,9 +350,11 @@ def choose_net(net_name):
         return NestedUNet
 
 
-if __name__ == '__main__':
-    #net = resnet34(3, 4, False) # out_channel = 4  4分类问题
-    #print(net)
-    x = torch.rand((1, 3, 512, 512)) #N，C, H, W
-    #print(net.forward(x).shape)
+#net = resnet34(3, 4, False) # out_channel = 4  4分类问题
+#print(net)
+x = torch.rand((1, 3, 512, 512)) #N，C, H, W
+net = choose_net("resnet50")
+net=net(3,1)
+print(net)
+#print(net.forward(x).shape)
 
