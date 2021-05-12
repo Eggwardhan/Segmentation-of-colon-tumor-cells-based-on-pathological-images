@@ -127,7 +127,7 @@ def train_net(net,
     train_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
     val_loader = DataLoader(dataset2, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
 
-    writer = SummaryWriter(comment=f'LR_{lr}_BS_{batch_size}_SCALE_{img_scale}_LOSS_{criterion}')
+    writer = SummaryWriter(comment=f'{args.net}_{lr}_{batch_size}_{img_scale}_{criterion}')
     global_step = 0
     # 基本信息
     logging.info(f'''Starting training:
@@ -154,7 +154,7 @@ def train_net(net,
         tflat = target.view(-1)
         intersection = (iflat * tflat).sum()
         return 1-((2.0*intersection + smooth)/(iflat.sum()+tflat.sum()+smooth))
-    def combo_loss(input,target,alpha=0.7):
+    def combo_loss(input,target,alpha=0.6):
         loss1=nn.BCEWithLogitsLoss(torch.Tensor([7]).to(device))
         tmp = alpha*loss1(input,target)-(1-alpha)*(1-dice_loss(input,target))
         return tmp
@@ -175,6 +175,8 @@ def train_net(net,
     for epoch in range(epochs):
         net.train()
         epoch_loss = 0
+        best_auc=0
+        best_dice=0
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
                 imgs = batch['image']
@@ -192,7 +194,13 @@ def train_net(net,
                 #print("true mask shape: %s " % true_masks.shape)
                 masks_pred = net(imgs)
                 #print("predict mask shape:%s" % mask_pred.shape)
-                loss = criterion(masks_pred,true_masks)
+                if net.deep_supervision==True:
+                    loss_s=0
+                    for output in masks_pred:
+                        loss_s+=criterion(output,true_masks)
+                    loss=loss_s/len(output)
+                else:
+                    loss = criterion(masks_pred,true_masks)
                 epoch_loss += loss.item()
                 writer.add_scalar('Loss/train', loss.item(), global_step)
 
@@ -212,20 +220,29 @@ def train_net(net,
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
                         writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step)
                     val_score = eval_net(net, val_loader, device)
-                    scheduler.step(val_score)
+                    scheduler.step(val_score["loss"])
+                    if best_auc<val_score["auc"] and best_dice<val_score["loss"]:
+                        best_auc=val_score["auc"]
+                        best_dice=val_score["loss"]
+
+
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
                     logging.info('lr: {}'.format(optimizer.param_groups[0]['lr']))
                     if net.n_classes > 1:
-                        logging.info('Validation cross entropy: {}'.format(val_score))
-                        writer.add_scalar('Loss/test', val_score, global_step)
+                        logging.info('Validation cross entropy: {}'.format(val_score["loss"]))
+                        writer.add_scalar('Loss/test', val_score["loss"], global_step)
                     else:
-                        logging.info('Validation Dice Coeff: {}'.format(val_score))
-                        writer.add_scalar('Dice/test', val_score, global_step)
-
+                        logging.info('Validation Dice Coeff: {}'.format(val_score["loss"]))
+                        writer.add_scalar('Dice/test', val_score["loss"], global_step)
+                        logging.info("Auc coeff:{}".format(val_score["auc"]))
+                        writer.add_scalar("Auc/test",val_score["auc"],global_step)
                     writer.add_images('images', imgs, global_step)
                     if net.n_classes == 1:
                         writer.add_images('masks/true', true_masks, global_step)
-                        writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
+                        if net.deep_supervision==True:
+                            writer.add_images('masks/pred', torch.sigmoid(masks_pred[-1]) > 0.5, global_step)
+                        else:
+                            writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
 
         if save_cp:
             try:
@@ -235,7 +252,7 @@ def train_net(net,
                 pass
             torch.save(net.state_dict(),
                        dir_checkpoint + f'{args.net}batch{str(args.batchsize)}scale{args.scale}criterion{args.criterion}epoch{epoch + 1}.pth')
-            logging.info(f'Checkpoint {epoch + 1} saved !')
+            logging.info(f'Checkpoint {epoch + 1} saved !best_auc:{best_auc},best_dice:{best_dice}')
 
     writer.close()
 
