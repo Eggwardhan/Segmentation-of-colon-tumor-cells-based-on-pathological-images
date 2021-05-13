@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from .nested_unet import NestedUNet
 from .nested_unet import unet as UNet
 import torch.utils.model_zoo as model_zoo
-from  UResNet import UNetWithResnet50Encoder  as resnet50
+from  .UResNet import UNetWithResnet50Encoder  as resnet50
 
 def DoubleConv(in_channels, out_channels,mid_channels=None):
     if not mid_channels:
@@ -317,7 +317,7 @@ def resnet34(in_channel,out_channel,pretrain=True):
         model.load_pretrained_weights()
     return model
 
-def resnet50(in_channel,out_channel,pretrain=True):
+def resnet50_f(in_ch,out_channel,pretrain=True):
     """ return a ResNet 50 object
     args:
         pretrain(bool): if true , return a model pre-trained on imagenet
@@ -327,7 +327,8 @@ def resnet50(in_channel,out_channel,pretrain=True):
         url = "https://s3.amazonaws.com/pytorch/models/resnet50-19c8e357.pth"
         #model.load_state_dict(model_zoo.load_url(url))
         model.load_pretrained_weights("resnet50")'''
-    return resnet50
+    model= resnet50(in_ch,out_channel)
+    return model
 
 def resnet101():
     """ return a ResNet 101 object
@@ -343,7 +344,7 @@ def choose_net(net_name):
     if net_name=="resnet34":
         return resnet34
     if net_name=="resnet50":
-        return resnet50
+        return resnet50_f
     elif net_name=="unet":
         return UNet
     elif net_name=="nested_unet":

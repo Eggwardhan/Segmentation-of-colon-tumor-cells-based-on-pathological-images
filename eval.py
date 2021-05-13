@@ -27,33 +27,45 @@ def eval_net(net, loader, device):
                 #print(mask_pred)
             if net.n_classes > 1:
                 tot += F.cross_entropy(mask_pred, true_masks).item()
-            else:
-                if net.deep_supervision==True:
-                    for i in mask_pred:
-                        auc_temp=0
-                        pred = torch.sigmoid(i)
-                        tot += dice_coeff(pred.cuda(1),true_masks.cuda(1))
+            elif net.n_classes==1:
+                if hasattr(net,"deep_supervision"):
+                    if net.deep_supervision==True:
+                        for i in mask_pred:
+                            auc_temp=0
+                            pred = torch.sigmoid(i)
+                            tot += dice_coeff(pred.to(device),true_masks.to(device),device)
+                            pred=pred.cpu()
+                            true_masks=true_masks.cpu()
+                            try:
+                                auc_temp+=roc_auc_score(pred.view(-1)>0.5,true_masks.view(-1))
+                            except ValueError:
+                                trash+=1
+                        if trash!=mask_pred:
+                            auc+=auc_temp/(len(mask_pred)-trash)
+
+                        tot/=len(mask_pred)
+                    else:
+                        pred = torch.sigmoid(mask_pred)
+                        pred = (pred > 0.5).float()
+                         #print(pred)
+                        tot += dice_coeff(pred.to(device), true_masks.to(device),device).item()
                         pred=pred.cpu()
                         true_masks=true_masks.cpu()
                         try:
-                            auc_temp+=roc_auc_score(pred.view(-1)>0.5,true_masks.view(-1))
+                            auc+=roc_auc_score(pred.view(-1)>0.5,true_masks.view(-1))
                         except ValueError:
                             trash+=1
-                    if trash!=mask_pred:
-                        auc+=auc_temp/(len(mask_pred)-trash)
-
-                    tot/=len(mask_pred)
                 else:
-                    pred = torch.sigmoid(mask_pred)
-                    pred = (pred > 0.5).float()
-                     #print(pred)
-                    tot += dice_coeff(pred.cuda(1), true_masks.cuda(1)).item()
-                    pred=pred.cpu()
-                    true_masks=true_masks.cpu()
-                    try:
-                        auc+=roc_auc_score(pred.view(-1)>0.5,true_masks.view(-1))
-                    except ValueError:
-                        trash+=1
+                        pred = torch.sigmoid(mask_pred)
+                        pred = (pred > 0.5).float()
+                         #print(pred)
+                        tot += dice_coeff(pred.to(device), true_masks.to(device),device).item()
+                        pred=pred.cpu()
+                        true_masks=true_masks.cpu()
+                        try:
+                            auc+=roc_auc_score(pred.view(-1)>0.5,true_masks.view(-1))
+                        except ValueError:
+                            trash+=1
             pbar.update()
 
     net.train()

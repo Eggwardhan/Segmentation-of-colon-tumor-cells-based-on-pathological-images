@@ -154,7 +154,7 @@ def train_net(net,
         tflat = target.view(-1)
         intersection = (iflat * tflat).sum()
         return 1-((2.0*intersection + smooth)/(iflat.sum()+tflat.sum()+smooth))
-    def combo_loss(input,target,alpha=0.6):
+    def combo_loss(input,target,alpha=0.5):
         loss1=nn.BCEWithLogitsLoss(torch.Tensor([7]).to(device))
         tmp = alpha*loss1(input,target)-(1-alpha)*(1-dice_loss(input,target))
         return tmp
@@ -194,11 +194,14 @@ def train_net(net,
                 #print("true mask shape: %s " % true_masks.shape)
                 masks_pred = net(imgs)
                 #print("predict mask shape:%s" % mask_pred.shape)
-                if net.deep_supervision==True:
-                    loss_s=0
-                    for output in masks_pred:
-                        loss_s+=criterion(output,true_masks)
-                    loss=loss_s/len(output)
+                if hasattr(net,"deep_supervision"):
+                    if net.deep_supervision==True:
+                        loss_s=0
+                        for output in masks_pred:
+                            loss_s+=criterion(output,true_masks)
+                        loss=loss_s/len(output)
+                    else:
+                        loss = criterion(masks_pred,true_masks)
                 else:
                     loss = criterion(masks_pred,true_masks)
                 epoch_loss += loss.item()
@@ -239,8 +242,11 @@ def train_net(net,
                     writer.add_images('images', imgs, global_step)
                     if net.n_classes == 1:
                         writer.add_images('masks/true', true_masks, global_step)
-                        if net.deep_supervision==True:
-                            writer.add_images('masks/pred', torch.sigmoid(masks_pred[-1]) > 0.5, global_step)
+                        if hasattr(net,"deep_supervision"):
+                            if net.deep_supervision==True:
+                                writer.add_images('masks/pred', torch.sigmoid(masks_pred[-1]) > 0.5, global_step)
+                            else:
+                                writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
                         else:
                             writer.add_images('masks/pred', torch.sigmoid(masks_pred) > 0.5, global_step)
 
@@ -294,7 +300,8 @@ if __name__ == '__main__':
     #   - For 2 classes, use n_classes=1
     #   - For N > 2 classes, use n_classes=N
     net =  model.choose_net(args.net)
-    net = net(in_channel=3,out_channel=1)
+    net = net(3,1)
+    #print(net)
     logging.info(f'Network:\n'
                 f'\t{net.n_channels} input channels\n'
                  f'\t{net.n_classes} output channels (classes)\n'

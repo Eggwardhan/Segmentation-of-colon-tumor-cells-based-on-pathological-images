@@ -31,10 +31,10 @@ class DiceCoeff(Function):
         return grad_input, grad_target
 
 
-def dice_coeff(input, target):
+def dice_coeff(input, target,device):
     """Dice coeff for batches"""
     if input.is_cuda:
-        s = torch.FloatTensor(1).cuda(1).zero_()
+        s = torch.FloatTensor(1).to(device).zero_()
     else:
         s = torch.FloatTensor(1).zero_()
 
