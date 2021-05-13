@@ -48,6 +48,9 @@ class UpBlockForUNetWithResNet50(nn.Module):
     def __init__(self, in_channels, out_channels, up_conv_in_channels=None, up_conv_out_channels=None,
                  upsampling_method="conv_transpose"):
         super().__init__()
+        self.n_channels=in_channels
+        self.outc=self.n_classes=out_channels
+
 
         if up_conv_in_channels == None:
             up_conv_in_channels = in_channels
@@ -80,8 +83,11 @@ class UpBlockForUNetWithResNet50(nn.Module):
 class UNetWithResnet50Encoder(nn.Module):
     DEPTH = 6
 
-    def __init__(self, n_classes=2):
+    def __init__(self,in_channel, out_channel=1):
         super().__init__()
+        self.n_channels = in_channel
+        self.outc=self.n_classes=out_channel
+
         resnet = torchvision.models.resnet.resnet50(pretrained=True)
         down_blocks = []
         up_blocks = []
@@ -102,7 +108,7 @@ class UNetWithResnet50Encoder(nn.Module):
 
         self.up_blocks = nn.ModuleList(up_blocks)
 
-        self.out = nn.Conv2d(64, n_classes, kernel_size=1, stride=1)
+        self.out = nn.Conv2d(64, out_channel, kernel_size=1, stride=1)
 
     def forward(self, x, with_output_feature_map=False):
         pre_pools = dict()
@@ -129,5 +135,5 @@ class UNetWithResnet50Encoder(nn.Module):
             return x, output_feature_map
         else:
             return x
-
-model = UNetWithResnet50Encoder()
+        print(x)
+#model = UNetWithResnet50Encoder()
